@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Agent 安全讲解幻灯片</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    background: #fdf6ec;
+    overflow: hidden;
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .deck {
+    width: 100vw; height: 100vh;
+    display: grid; place-items: center;
+    overflow: hidden;
+  }
+  /* 外框：纯 CSS 保持 1180:658 比例并适配任意窗口（含手机） */
+  #frame {
+    width: min(100vw, calc(100vh * 1.79331));
+    aspect-ratio: 1180 / 658;
+    position: relative;
+    overflow: hidden;
+    background: #fdf6ec;
+  }
+  /* 内容画布：固定坐标系，按外框实际宽度等比缩放 */
+  #stage {
+    width: 1180px; height: 658px;
+    position: absolute; left: 0; top: 0;
+    background: #fdf6ec;
+    overflow: hidden;
+    transform-origin: 0 0;
+  }
+  .slide {
+    position: absolute; inset: 0;
+    opacity: 0; visibility: hidden;
+    transition: opacity .35s ease;
+  }
+  .slide.active { opacity: 1; visibility: visible; }
+
+  h1 {
+    position: absolute; top: 18px; left: 0; right: 0;
+    text-align: center;
+    font-size: 42px; font-weight: 800; color: #141414;
+    letter-spacing: 1px;
+  }
+
+  /* ---- 通用元素动画 ---- */
+  .el {
+    position: absolute;
+    opacity: 0; transform: scale(.55);
+    transition: opacity .4s ease, transform .45s cubic-bezier(.34,1.56,.64,1);
+  }
+  .el.on { opacity: 1; transform: scale(1); }
+
+  .cap {
+    position: absolute; left: 0; right: 0;
+    text-align: center;
+    font-size: 23px; font-weight: 800; color: #141414;
+    line-height: 1.55;
+    opacity: 0; transform: translateY(16px);
+    transition: opacity .5s ease, transform .5s ease;
+  }
+  .cap.on { opacity: 1; transform: translateY(0); }
+  .cap b { color: #8b1a12; }
+
+  /* ---- 箭头 SVG ---- */
+  svg.arrows {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    overflow: visible;
+  }
+  .arrow {
+    fill: none; stroke: #141414; stroke-width: 5;
+    stroke-linecap: round;
+    transition: stroke-dashoffset .55s ease .05s;
+  }
+  .arrow.on { stroke-dashoffset: 0 !important; }
+  .ahead {
+    fill: none; stroke: #141414; stroke-width: 5;
+    stroke-linecap: round; stroke-linejoin: round;
+    opacity: 0; transition: opacity .2s ease .5s;
+  }
+  .ahead.on { opacity: 1; }
+
+  /* ---- 部件样式 ---- */
+  .figure { text-align: center; }
+  .figure .emo { font-size: 60px; line-height: 1.1; }
+  .figure .lbl {
+    margin-top: 6px;
+    font-size: 19px; font-weight: 800; color: #141414;
+    line-height: 1.4; white-space: pre-line;
+  }
+  .figure .lbl.red { color: #8b1a12; }
+
+  .note {
+    font-size: 18px; font-weight: 800; color: #141414;
+    white-space: pre-line; line-height: 1.4;
+  }
+
+  .term {
+    background: #101010; border-radius: 8px;
+    padding: 10px 16px;
+    font-family: Consolas, Menlo, monospace;
+    font-size: 19px; font-weight: 700; line-height: 1.5;
+    box-shadow: 0 2px 6px rgba(0,0,0,.25);
+  }
+  .term .cmd { color: #fff; }
+  .term .err { color: #ff3b30; }
+
+  .xmark { font-size: 40px; color: #8b1a12; font-weight: 900; }
+
+  .block {
+    border-radius: 6px;
+    font-weight: 800; text-align: center;
+    display: flex; flex-direction: column; justify-content: center;
+  }
+
+  .badge {
+    border-radius: 8px; padding: 8px 14px;
+    font-weight: 800; text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="deck">
+<div id="frame">
+<div id="stage">
+
+  <!-- ================= 场景 1：Doom Loop 问题 ================= -->
+  <section class="slide">
+    <h1>Doom Loop 问题</h1>
+
+    <div class="el figure" data-step="1" style="left:55px; top:225px; width:190px;">
+      <div class="emo">🤔</div>
+      <div class="lbl">模型认定
+某个命令应该存在</div>
+    </div>
+
+    <div class="el term" data-step="2" style="left:295px; top:245px; width:305px;">
+      <div class="cmd">$ some_cmd —opt</div>
+      <div class="err">Error: command not found</div>
+    </div>
+
+    <div class="el figure" data-step="3" style="left:340px; top:345px; width:220px;">
+      <span class="xmark">✕</span>
+      <span style="font-size:24px; font-weight:800; color:#8b1a12; vertical-align:8px; margin-left:10px;">执行失败</span>
+    </div>
+
+    <div class="el term" data-step="4" style="left:700px; top:110px; width:225px; font-size:17px;">
+      <div class="cmd">$ some_cmd —a</div>
+      <div class="err">Error: ……</div>
+    </div>
+    <div class="el term" data-step="4" style="left:700px; top:222px; width:225px; font-size:17px; transition-delay:.12s;">
+      <div class="cmd">$ some_cmd —b</div>
+      <div class="err">Error: ……</div>
+    </div>
+    <div class="el term" data-step="4" style="left:700px; top:334px; width:225px; font-size:17px; transition-delay:.24s;">
+      <div class="cmd">$ some_cmd —c</div>
+      <div class="err">Error: ……</div>
+    </div>
+
+    <div class="el note" data-step="5" style="left:690px; top:432px; color:#8b1a12; font-size:21px;">不断尝试不同参数、路径</div>
+
+    <div class="el figure" data-step="6" style="left:965px; top:230px; width:200px;">
+      <div class="emo">😵</div>
+      <div class="lbl">模型被钉在错误节点
+无法跳出当前错误假设</div>
+    </div>
+
+    <svg class="arrows" viewBox="0 0 1180 658">
+      <path class="arrow" data-step="2" d="M 190 292 Q 240 262 283 272"/>
+      <path class="arrow" data-step="4" d="M 610 268 Q 655 200 692 152"/>
+      <path class="arrow" data-step="4" d="M 610 282 Q 650 278 690 262"/>
+      <path class="arrow" data-step="4" d="M 610 300 Q 655 345 690 370"/>
+    </svg>
+  </section>
+
+  <!-- ================= 场景 2：System Prompt 为什么拦不住死循环 ================= -->
+  <section class="slide">
+    <h1>System Prompt 为什么拦不住死循环</h1>
+
+    <div class="el note" data-step="1" style="left:200px; top:94px; width:360px; text-align:center; font-size:22px;">Context</div>
+    <div class="el" data-step="1" style="left:200px; top:122px; width:360px; height:390px; border:5px solid #f5a623; border-radius:4px;"></div>
+    <div class="el note" data-step="1" style="left:106px; top:200px; writing-mode:vertical-lr; letter-spacing:10px; font-size:21px;">距离从远到近</div>
+
+    <div class="el block" data-step="2" style="left:225px; top:142px; width:310px; height:96px; background:#1a73e8; color:#fff;">
+      <div style="font-size:21px;">System Prompt</div>
+      <div style="font-size:17px; text-align:left; padding-left:34px; margin-top:4px;">- 规则1<br>- 连续失败请停止</div>
+    </div>
+
+    <div class="el block" data-step="3" style="left:225px; top:252px; width:310px; height:44px; background:#16c9b8; color:#0c4b45; font-size:22px;">……</div>
+
+    <div class="el block" data-step="4" style="left:225px; top:310px; width:310px; height:44px; background:#e5322d; color:#141414; font-size:19px;">Tool Result：命令不存在</div>
+    <div class="el block" data-step="4" style="left:225px; top:366px; width:310px; height:44px; background:#e5322d; color:#141414; font-size:19px; transition-delay:.12s;">Tool Result：命令不存在</div>
+    <div class="el block" data-step="4" style="left:225px; top:422px; width:310px; height:44px; background:#e5322d; color:#141414; font-size:19px; transition-delay:.24s;">Tool Result：命令不存在</div>
+
+    <div class="el figure" data-step="5" style="left:660px; top:355px; width:150px;">
+      <div class="emo">🙂</div>
+      <div class="lbl">模型注意力</div>
+    </div>
+
+    <div class="el figure" data-step="6" style="left:635px; top:118px; width:340px; text-align:left;">
+      <span class="xmark" style="font-size:30px;">✕</span>
+      <span class="note" style="position:static; color:#8b1a12; font-size:21px; margin-left:12px; vertical-align:5px;">近因偏差</span>
+      <div class="note" style="position:static; color:#8b1a12; font-size:17px; margin-top:2px; margin-left:46px;">模型更关注最近的信息</div>
+    </div>
+    <div class="el figure" data-step="7" style="left:635px; top:210px; width:400px; text-align:left;">
+      <span class="xmark" style="font-size:30px;">✕</span>
+      <span class="note" style="position:static; color:#8b1a12; font-size:21px; margin-left:12px; vertical-align:5px;">重复报错</span>
+      <div class="note" style="position:static; color:#8b1a12; font-size:17px; margin-top:2px; margin-left:46px;">重复信息成为上下文最强的信号</div>
+    </div>
+
+    <p class="cap" data-step="8" style="bottom:28px;">真正的问题不是 System Prompt 被遗忘，<br>而是重复的错误信息叠加近因偏差，抢走了模型对全局规则的注意力。</p>
+
+    <svg class="arrows" viewBox="0 0 1180 658">
+      <path class="arrow" data-step="1" d="M 158 130 L 158 500"/>
+      <path class="arrow" data-step="5" d="M 668 388 Q 610 340 552 332"/>
+      <path class="arrow" data-step="5" d="M 665 400 Q 605 392 552 388"/>
+      <path class="arrow" data-step="5" d="M 668 415 Q 612 435 552 444"/>
+    </svg>
+  </section>
+
+  <!-- ================= 场景 3：System Reminders 机制 ================= -->
+  <section class="slide">
+    <h1>System Reminders 机制</h1>
+
+    <div class="el figure" data-step="1" style="left:42px; top:140px; width:120px;">
+      <div class="emo">🤖</div>
+      <div class="lbl">Agent</div>
+    </div>
+    <div class="el note" data-step="1" style="left:122px; top:105px; font-size:17px;">即将开始
+下一轮推理</div>
+
+    <div class="el" data-step="2" style="left:262px; top:97px; width:430px; height:200px; background:#f7ce46; border-radius:8px; padding:10px 16px;">
+      <div style="font-weight:800; font-size:20px; color:#141414;"><span style="font-size:26px;">⚙️</span>  Reminder Injector</div>
+      <div style="border:3px solid #141414; border-radius:4px; margin:8px 0 0 40px; width:330px; padding:3px 10px; font-weight:800; font-size:17px; color:#8b1a12; background:#fbe27f;">连续几轮相似报错？</div>
+      <div style="border:3px solid #141414; border-radius:4px; margin:8px 0 0 40px; width:330px; padding:3px 10px; font-weight:800; font-size:17px; color:#8b1a12; background:#fbe27f;">反复调用同一个工具失败？</div>
+      <div style="border:3px solid #141414; border-radius:4px; margin:8px 0 0 40px; width:330px; padding:3px 10px; font-weight:800; font-size:17px; color:#8b1a12; background:#fbe27f;">重试次数超阈值？</div>
+    </div>
+
+    <div class="el note" data-step="3" style="left:735px; top:175px; font-size:19px;">发现异常</div>
+    <div class="el badge" data-step="3" style="left:810px; top:210px; width:330px; background:#34c759; color:#0b3d1d; font-size:16px; text-align:left; line-height:1.5;">你已经连续三次在同一个错误上重试，请先重新分析问题根因，而不是继续微调命令参数。</div>
+
+    <div class="el" data-step="4" style="left:330px; top:300px; width:330px; height:236px; border:5px solid #f5a623; border-radius:4px; background:#fdf6ec; padding:10px;">
+      <div class="block" style="position:relative; width:100%; height:36px; background:#16c9b8; color:#0c4b45; font-size:19px; margin-bottom:8px;">……</div>
+      <div class="block" style="position:relative; width:100%; height:36px; background:#e5322d; color:#141414; font-size:16px; margin-bottom:8px;">Tool Result：命令不存在</div>
+      <div class="block" style="position:relative; width:100%; height:36px; background:#e5322d; color:#141414; font-size:16px; margin-bottom:8px;">Tool Result：命令不存在</div>
+      <div class="block" style="position:relative; width:100%; height:36px; background:#e5322d; color:#141414; font-size:16px;">Tool Result：命令不存在</div>
+    </div>
+    <div class="el block" data-step="5" style="left:345px; top:486px; width:300px; height:36px; background:#f7ce46; color:#141414; font-size:16px;">User Message：提醒</div>
+    <div class="el note" data-step="5" style="left:700px; top:415px; font-size:19px;">注入提醒</div>
+
+    <div class="el figure" data-step="6" style="left:75px; top:370px; width:130px;">
+      <div class="emo" style="font-size:64px; color:#141414;">❋</div>
+      <div class="lbl">大模型</div>
+    </div>
+    <div class="el note" data-step="6" style="left:200px; top:365px; font-size:18px;">调用大模型</div>
+
+    <p class="cap" data-step="7" style="bottom:22px; font-size:21px;">模型既然对距离敏感，那就利用近因偏差，在每轮决策前，通过<br><b>System Reminders</b> 将高优提醒注入上下文末尾，及时纠正模型的错误方向。</p>
+
+    <svg class="arrows" viewBox="0 0 1180 658">
+      <path class="arrow" data-step="1" d="M 150 200 Q 205 182 252 177"/>
+      <path class="arrow" data-step="3" d="M 700 225 Q 760 235 800 252"/>
+      <path class="arrow" data-step="5" d="M 810 320 Q 740 400 672 452"/>
+      <path class="arrow" data-step="6" d="M 322 435 Q 265 428 212 420"/>
+    </svg>
+  </section>
+
+  <!-- ================= 场景 4：安全不能指望模型“讲道理” ================= -->
+  <section class="slide">
+    <h1>安全不能指望模型“讲道理”</h1>
+
+    <div class="el badge" data-step="1" style="left:445px; top:118px; width:225px; background:#f7ce46;">
+      <div style="font-size:21px; color:#141414;">System Prompt</div>
+      <div style="font-size:19px; color:#8b1a12;">禁止执行rm -rf</div>
+    </div>
+
+    <div class="el figure" data-step="2" style="left:150px; top:290px; width:130px;">
+      <div class="emo">🧑‍💻</div>
+      <div class="lbl">开发者</div>
+    </div>
+    <div class="el note" data-step="2" style="left:295px; top:280px; font-size:19px;">帮我清理无用日志</div>
+    <div class="el figure" data-step="2" style="left:510px; top:290px; width:130px;">
+      <div class="emo" style="font-size:64px; color:#141414;">❋</div>
+      <div class="lbl">大模型</div>
+    </div>
+
+    <div class="el note" data-step="3" style="left:660px; top:290px; font-size:19px;">生成命令</div>
+    <div class="el figure" data-step="3" style="left:770px; top:300px; width:90px;">
+      <div class="emo" style="font-size:58px;">🗑️</div>
+    </div>
+    <div class="el badge" data-step="3" style="left:865px; top:318px; background:#ff3b30; color:#141414; font-family:Consolas,monospace; font-size:22px; font-weight:800;">rm -rf</div>
+
+    <div class="el figure" data-step="4" style="left:760px; top:158px; width:260px;">
+      <div class="emo" style="font-size:52px;">😨</div>
+      <div class="lbl red">灾难！！！
+所有日志都被清空了</div>
+    </div>
+
+    <p class="cap" data-step="5" style="bottom:50px;">模型即使不陷入死循环，也可能做出灾难性决策，因此安全性不能依赖模型自觉</p>
+
+    <svg class="arrows" viewBox="0 0 1180 658">
+      <path class="arrow" data-step="2" d="M 250 340 Q 380 365 500 350"/>
+      <path class="arrow" data-step="2" d="M 558 200 Q 565 240 572 282"/>
+      <path class="arrow" data-step="3" d="M 645 335 Q 705 342 762 340"/>
+    </svg>
+  </section>
+
+  <!-- ================= 场景 5：Middleware 拦截与人工审批闸门 ================= -->
+  <section class="slide">
+    <h1>Middleware 拦截与人工审批闸门</h1>
+
+    <div class="el figure" data-step="1" style="left:30px; top:270px; width:110px;">
+      <div class="emo">🤖</div>
+      <div class="lbl">Agent</div>
+    </div>
+    <div class="el note" data-step="1" style="left:85px; top:178px; font-size:17px;">发起 Tool Call</div>
+    <div class="el figure" data-step="1" style="left:200px; top:158px; width:150px;">
+      <div class="emo" style="font-size:52px;">🗄️</div>
+      <div class="lbl">Tool Registry</div>
+    </div>
+
+    <div class="el figure" data-step="2" style="left:395px; top:158px; width:150px;">
+      <div class="emo" style="font-size:54px;">🛡️</div>
+      <div class="lbl">Middleware
+检查高危操作</div>
+    </div>
+
+    <div class="el figure" data-step="3" style="left:590px; top:80px; width:110px;">
+      <div class="emo" style="font-size:46px;">🙂</div>
+      <div class="lbl" style="font-size:17px;">安全操作</div>
+    </div>
+    <div class="el figure" data-step="3" style="left:790px; top:80px; width:170px;">
+      <div class="emo" style="font-size:50px;">💻</div>
+      <div class="lbl" style="font-size:17px;">执行
+tool.Execute()</div>
+    </div>
+
+    <div class="el figure" data-step="4" style="left:585px; top:250px; width:110px;">
+      <div class="emo" style="font-size:46px;">😬</div>
+      <div class="lbl" style="font-size:17px;">高危操作</div>
+    </div>
+    <div class="el figure" data-step="4" style="left:775px; top:245px; width:170px;">
+      <div class="badge" style="position:static; display:inline-block; background:#2a6ff2; color:#fff; font-size:20px; padding:6px 14px;">飞书</div>
+      <div class="lbl" style="font-size:17px;">发送审批到飞书</div>
+    </div>
+
+    <div class="el" data-step="5" style="left:700px; top:405px; width:265px; height:96px; background:#f7ce46; border-radius:8px; text-align:center; padding-top:8px;">
+      <div style="font-weight:800; font-size:19px; color:#141414;">人工审批</div>
+      <span class="badge" style="position:static; display:inline-block; background:#e5322d; color:#141414; font-size:18px; margin:8px 10px 0;">拒绝</span>
+      <span class="badge" style="position:static; display:inline-block; background:#28a745; color:#0b3d1d; font-size:18px; margin:8px 10px 0;">同意</span>
+    </div>
+
+    <div class="el figure" data-step="6" style="left:1010px; top:315px; width:110px;">
+      <div class="emo" style="font-size:44px;">🙂</div>
+      <div class="lbl" style="font-size:17px;">安全操作</div>
+    </div>
+
+    <div class="el figure" data-step="7" style="left:400px; top:390px; width:170px;">
+      <div class="emo" style="font-size:46px;">😖</div>
+      <div class="lbl" style="font-size:17px;">人类拒绝执行
+重新规划</div>
+    </div>
+
+    <p class="cap" data-step="8" style="bottom:16px; font-size:21px;">通过 <b>Middleware</b> 在工具真正执行前拦截高危操作，挂起执行并请求人工审批，<br>获批后继续执行、拒绝则重新规划。</p>
+
+    <svg class="arrows" viewBox="0 0 1180 658">
+      <path class="arrow" data-step="1" d="M 105 290 Q 150 265 195 238"/>
+      <path class="arrow" data-step="2" d="M 340 205 Q 368 200 390 198"/>
+      <path class="arrow" data-step="3" d="M 505 180 Q 545 150 582 128"/>
+      <path class="arrow" data-step="3" d="M 690 122 Q 740 122 782 125"/>
+      <path class="arrow" data-step="4" d="M 505 240 Q 545 265 578 285"/>
+      <path class="arrow" data-step="4" d="M 685 296 Q 730 293 770 288"/>
+      <path class="arrow" data-step="4" d="M 855 320 Q 848 360 840 398"/>
+      <path class="arrow" data-step="6" d="M 950 470 Q 1000 445 1035 415"/>
+      <path class="arrow" data-step="6" d="M 1062 310 Q 1030 220 968 145"/>
+      <path class="arrow" data-step="7" d="M 692 470 Q 640 465 585 450"/>
+      <path class="arrow" data-step="7" d="M 400 430 Q 240 400 122 335"/>
+    </svg>
+  </section>
+
+  <!-- ================= 场景 6：沙箱与权限体系 ================= -->
+  <section class="slide">
+    <h1>沙箱与权限体系</h1>
+
+    <div class="el figure" data-step="1" style="left:115px; top:230px; width:110px;">
+      <div class="emo">🤖</div>
+      <div class="lbl">Agent</div>
+    </div>
+    <div class="el note" data-step="1" style="left:230px; top:200px; font-size:19px;">操作请求</div>
+
+    <div class="el figure" data-step="2" style="left:335px; top:215px; width:160px;">
+      <div class="emo" style="font-size:56px;">🛡️</div>
+      <div class="lbl">Middleware
+检查高危操作</div>
+    </div>
+
+    <div class="el block" data-step="3" style="left:575px; top:135px; width:340px; height:76px; background:#1e5b2e; color:#fff;">
+      <div style="font-size:20px;">allow（直接放行）</div>
+      <div style="font-size:17px;">例：git status（只读）</div>
+    </div>
+    <div class="el block" data-step="4" style="left:575px; top:245px; width:340px; height:76px; background:#d96a1a; color:#fff;">
+      <div style="font-size:20px;">ask（人工审批）</div>
+      <div style="font-size:17px;">例：git push（高风险）</div>
+    </div>
+    <div class="el block" data-step="5" style="left:575px; top:355px; width:340px; height:76px; background:#7c1d12; color:#fff;">
+      <div style="font-size:20px;">deny（禁止拦截）</div>
+      <div style="font-size:17px;">例：rm -rf（危险命令）</div>
+    </div>
+
+    <p class="cap" data-step="6" style="bottom:36px;">云端运维（AgentOps）面对生产环境时无法依赖物理隔离，<br>需要在 <b>Middleware</b> 中建立三态权限控制</p>
+
+    <svg class="arrows" viewBox="0 0 1180 658">
+      <path class="arrow" data-step="1" d="M 210 280 Q 270 273 328 268"/>
+      <path class="arrow" data-step="3" d="M 460 250 Q 515 210 568 178"/>
+      <path class="arrow" data-step="4" d="M 465 272 Q 518 278 568 282"/>
+      <path class="arrow" data-step="5" d="M 460 295 Q 515 345 568 388"/>
+    </svg>
+  </section>
+
+  <div id="hud" style="position:absolute; right:12px; bottom:8px; font-size:13px; color:#141414; opacity:.3; font-weight:700;"></div>
+</div>
+</div>
+</div>
+
+<script>
+(function () {
+  const NS = 'http://www.w3.org/2000/svg';
+  const stage = document.getElementById('stage');
+  const slides = [...document.querySelectorAll('.slide')];
+  const hud = document.getElementById('hud');
+  let cur = 0, step = 0, autoTimer = null;
+
+  // 为每条箭头生成箭头头部，并准备描边动画
+  document.querySelectorAll('path.arrow').forEach(p => {
+    const L = p.getTotalLength();
+    const end = p.getPointAtLength(L);
+    const before = p.getPointAtLength(Math.max(0, L - 2));
+    const ang = Math.atan2(end.y - before.y, end.x - before.x);
+    const h = 15, spread = 2.55;
+    const head = document.createElementNS(NS, 'path');
+    head.setAttribute('d',
+      `M ${end.x + Math.cos(ang + spread) * h} ${end.y + Math.sin(ang + spread) * h} ` +
+      `L ${end.x} ${end.y} ` +
+      `L ${end.x + Math.cos(ang - spread) * h} ${end.y + Math.sin(ang - spread) * h}`);
+    head.setAttribute('class', 'ahead');
+    head.dataset.step = p.dataset.step;
+    p.parentNode.appendChild(head);
+    p.style.strokeDasharray = L;
+    p.style.strokeDashoffset = L;
+  });
+
+  function maxStep(sl) {
+    return Math.max(0, ...[...sl.querySelectorAll('[data-step]')].map(e => +e.dataset.step));
+  }
+
+  function render() {
+    slides.forEach((sl, i) => {
+      const active = i === cur;
+      sl.classList.toggle('active', active);
+      sl.querySelectorAll('[data-step]').forEach(el => {
+        el.classList.toggle('on', active && +el.dataset.step <= step);
+      });
+    });
+    hud.textContent = `${cur + 1}/${slides.length} · ${step}/${maxStep(slides[cur])}`;
+  }
+
+  function next() {
+    if (step < maxStep(slides[cur])) step++;
+    else if (cur < slides.length - 1) { cur++; step = 0; }
+    else return false;
+    render();
+    return true;
+  }
+  function prev() {
+    if (step > 0) step--;
+    else if (cur > 0) { cur--; step = maxStep(slides[cur]); }
+    render();
+  }
+  function stopAuto() {
+    if (autoTimer) { clearInterval(autoTimer); autoTimer = null; hud.style.opacity = .3; }
+  }
+  function toggleAuto() {
+    if (autoTimer) { stopAuto(); return; }
+    hud.style.opacity = 0;
+    autoTimer = setInterval(() => { if (!next()) stopAuto(); }, 1700);
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') { stopAuto(); next(); }
+    else if (e.key === 'ArrowLeft') { stopAuto(); prev(); }
+    else if (e.key.toLowerCase() === 'a') toggleAuto();
+    else if (e.key.toLowerCase() === 'h') hud.style.opacity = hud.style.opacity === '0' ? .3 : 0;
+    else if (e.key === 'Home') { stopAuto(); cur = 0; step = 0; render(); }
+  });
+  // 点击/触摸翻页：左 1/3 上一步，其余下一步（手机可直接点按）
+  stage.addEventListener('click', e => {
+    stopAuto();
+    (e.clientX < innerWidth / 3 || e.shiftKey) ? prev() : next();
+  });
+
+  // 画布缩放：量取外框实际宽度，不依赖窗口尺寸，任何环境（含手机）都准确
+  const frame = document.getElementById('frame');
+  function fit() {
+    stage.style.transform = `scale(${frame.clientWidth / 1180})`;
+  }
+  addEventListener('resize', fit);
+  addEventListener('load', fit);
+  if (window.ResizeObserver) new ResizeObserver(fit).observe(frame);
+  fit();
+
+  // 支持 ?s=场景号(1起)&k=步骤号 直接定位，便于调试与录制；&noanim=1 禁用动画
+  const q = new URLSearchParams(location.search);
+  if (q.has('s')) cur = Math.min(slides.length - 1, Math.max(0, +q.get('s') - 1));
+  if (q.has('k')) step = Math.min(maxStep(slides[cur]), +q.get('k'));
+  if (q.has('nohud')) hud.style.display = 'none';
+  if (q.has('debug')) {
+    const d = document.createElement('div');
+    d.style.cssText = 'position:fixed;left:0;top:0;background:#000;color:#0f0;font:14px monospace;z-index:99;padding:4px;';
+    const upd = () => { d.textContent = `iw=${innerWidth} ih=${innerHeight} fw=${frame.clientWidth} fh=${frame.clientHeight} tf=${stage.style.transform}`; };
+    setInterval(upd, 300); upd();
+    document.body.appendChild(d);
+  }
+  if (q.has('noanim')) {
+    const st = document.createElement('style');
+    st.textContent = '* { transition: none !important; }';
+    document.head.appendChild(st);
+  }
+  render();
+})();
+</script>
+</body>
+</html>
