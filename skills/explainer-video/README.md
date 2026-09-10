@@ -75,11 +75,14 @@ CHROME_PATH=C:\Program Files\Google\Chrome\Application\chrome.exe   # 默认位�
 
 值为空的行会被忽略（退回自动探测 / PATH / 内置默认值），路径含空格不用加引号。
 
-### 在其他 agent 里使用
+### 在各 agent 里使用
 
-- **Kimi Code CLI**：`kimi --skills-dir .claude/skills`，或把本目录放到 kimi 自动发现的 skills 目录（见 https://moonshotai.github.io/kimi-code/）。
-- **其他支持 Agent Skills 标准（`SKILL.md` + frontmatter）的工具**：把本目录整个拷到它的 skills 目录。
-- **不支持 skill 的工具**：把 `SKILL.md` 正文贴进系统提示词/项目说明，`template.html` 和 `build.py` 放到项目里即可。
+本 skill 位于仓库的 `.agents/skills/explainer-video/`，已在 Claude Code、Codex、Kimi Code CLI、grok-cli、zcode 上实测可用。
+
+- **Codex**：自动发现项目里的 `.agents/skills/`，无需配置。
+- **Kimi Code CLI**：`kimi --skills-dir .agents/skills`，或放到 kimi 的默认 skills 目录（见 https://moonshotai.github.io/kimi-code/）。
+- **Claude Code**：它读 `.claude/skills/`，在项目根目录做个链接指过来：Windows `mkdir .claude\skills` 后 `mklink /J .claude\skills\explainer-video .agents\skills\explainer-video`，Mac/Linux `mkdir -p .claude/skills && ln -s ../../.agents/skills/explainer-video .claude/skills/`。
+- **不支持 skill 目录的工具**：把 `SKILL.md` 正文贴进系统提示词/项目说明，`template.html` 和 `build.py` 放到项目里即可。
 - 没有内置联网、只有 MCP 搜索工具的 agent：第 1 步用 MCP 搜索代替 WebSearch，其余步骤完全不依赖联网。合成 mp4 本身不需要网络（TTS 调接口除外）。
 
 ## build.py 参数
