@@ -60,7 +60,7 @@ python "<本 skill 目录>/music.py" intro --song output/music/长安月冷.mp3 
 
 ## 已知坑
 
-- `mode=lyrics_to_instrumental`（按歌词结构编纯音乐）服务端稳定 500，脚本没暴露；纯音乐用 `--instrumental`。
+- `mode=lyrics_to_instrumental`（按歌词结构编纯音乐）服务端稳定 500，脚本没暴露；纯音乐用 `--instrumental`，且**必须带 `--prompt`**（只给 style 会 500，脚本会自动用 style 兜底）。建任务遇到 5xx/429 脚本会自动重试两次。
 - `--key`、`--instruments` 是自由文本，填错不报错也照样计费。
 - 平台返回的 `audio_url` 有效期未知，脚本已下载到本地，不要只存 URL。
 - ASR 对歌唱的说话人区分无效，别指望用它分析谁唱了哪句。

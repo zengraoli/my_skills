@@ -74,15 +74,21 @@ def find_tool(name):
     return shutil.which(name)
 
 
-def api_post(path, body, timeout=120):
-    r = requests.post(BASE + path, headers=headers(), json=body, timeout=timeout)
-    try:
-        j = r.json()
-    except ValueError:
-        j = {"raw": r.text[:500]}
-    if r.status_code != 200:
-        sys.exit(f"{path} 失败（HTTP {r.status_code}）：{json.dumps(j, ensure_ascii=False)[:500]}")
-    return j
+def api_post(path, body, timeout=120, retries=3):
+    for attempt in range(1, retries + 1):
+        r = requests.post(BASE + path, headers=headers(), json=body, timeout=timeout)
+        try:
+            j = r.json()
+        except ValueError:
+            j = {"raw": r.text[:500]}
+        if r.status_code == 200:
+            return j
+        msg = json.dumps(j, ensure_ascii=False)[:500]
+        if r.status_code in (429, 500, 502, 503) and attempt < retries:
+            print(f"{path} HTTP {r.status_code}，{20 * attempt} 秒后重试（{attempt}/{retries - 1}）：{msg[:120]}", flush=True)
+            time.sleep(20 * attempt)
+            continue
+        sys.exit(f"{path} 失败（HTTP {r.status_code}）：{msg}")
 
 
 def download(url, path):
@@ -172,6 +178,8 @@ def cmd_gen(args):
         warn_tags(text)
     if args.prompt:
         body["prompt"] = args.prompt
+    elif args.instrumental and args.style:
+        body["prompt"] = args.style          # 纯音乐模式不带 prompt 会稳定 500，用 style 兜底
     if args.style:
         body["style"] = args.style
     if not (args.prompt or args.style or args.lyrics or args.prebuilt):
@@ -229,7 +237,7 @@ def cmd_gen(args):
     song = data[0]
     (out_dir / f"{stem}_result.json").write_text(json.dumps(j, ensure_ascii=False, indent=1), encoding="utf-8")
     mp3 = download(song["audio_url"], out_dir / f"{stem}.{args.format if args.format != 'wav32' else 'wav'}")
-    cover = download(song["cover_url"], out_dir / f"{stem}_cover.jpg") if song.get("cover_url") else None
+    cover = download(song["cover_url"], out_dir / f"{stem}_cover.jpg") if song.get("cover_url") and not args.no_cover else None
     if song.get("lyrics"):
         (out_dir / f"{stem}_lyrics.txt").write_text(song["lyrics"], encoding="utf-8")
     print(f"完成：{mp3}  （{song.get('title')}，{song.get('duration')} 秒）")
