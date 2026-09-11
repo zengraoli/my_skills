@@ -21,7 +21,7 @@ python "<本 skill 目录>/music.py" check
 
 - **锁定歌手音色**：没有歌手音色 id，每首歌的嗓音由模型随机决定；只能用 `--ref` 喂上一首成品当参考，相似度不保证。
 - **男女对唱指定谁唱哪句**：`--gender duet` 只保证有男有女、副歌合唱，分配由模型决定；歌词里写 `[male]`、"男："之类会被**唱出来**且不改变声部。
-- **观众接唱 / 现场版**：没有观众标签；`--style` 里写 "live concert, crowd singing along" 只能得到氛围，"歌手唱一句观众接一句"做不到。
+- **观众接唱 / 现场版**：没有观众标签，"歌手唱一句观众接一句"做不到。想要高潮处有群唱感，用第 3 步的"重复句 + 现场 style"写法，实测副歌重复的那句会明显变厚，但只是"人变多了一点"，不是真正的观众声部。
 - **精确时长与前奏长度**：`--duration` 只是期望值；前奏常有 30–50 秒，靠第 4 步事后截。
 
 ## 第 2 步：准备歌词
@@ -41,6 +41,7 @@ python "<本 skill 目录>/music.py" gen --lyrics 歌词.txt --style "古风，�
 - `--gender male|female|any|duet`；纯音乐加 `--instrumental`（此时不需要歌词，`--bpm --key --time-signature --instruments` 可细调编曲）。
 - `--ref <公网 URL>` 参考曲风；用户给的本地 mp3/mp4 要先抽音轨 `ffmpeg -i in.mp4 -vn ref.mp3` 并上传到能公开访问的地方，脚本不接受本地路径。
 - `--prebuilt lyrics.json` 回灌第 2 步平台写的词。
+- **高潮群唱感（实测有效）**：把副歌最后一句在歌词里**原样连写两遍**（不加任何标记），`--style` 写 "live concert anthem recorded in a stadium, massive crowd singing along on the repeated last line of every chorus (gang vocals), audience cheering, stadium reverb"。第二遍会明显比第一遍厚。不要再加 `--extra` 指派"第二遍换观众唱"——实测反而让整首歌人声糊成一团。
 - 输出到 `output/music/<title>.mp3`、`<title>_cover.jpg`、`<title>_lyrics.txt`、`<title>_request.json`（可复现）。一次只出一首；想要多个版本就多跑几次改 `--title`。
 - 任务一般 1–3 分钟；返回 500"服务繁忙"时等一分钟重试。
 
