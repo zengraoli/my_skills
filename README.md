@@ -19,10 +19,20 @@
     │   ├── README.md
     │   ├── music.py
     │   └── .env
-    └── doc-podcast/
+    ├── doc-podcast/
+    │   ├── SKILL.md
+    │   ├── README.md
+    │   ├── podcast.py
+    │   └── .env
+    ├── suno-music/
+    │   ├── SKILL.md
+    │   ├── README.md
+    │   ├── suno.py
+    │   └── .env
+    └── asr-tts/
         ├── SKILL.md
         ├── README.md
-        ├── podcast.py
+        ├── speech.py
         └── .env
 ```
 
@@ -33,6 +43,8 @@
 | [explainer-video](skills/explainer-video/) | 输入一个主题，联网调研后自动产出手绘风讲解视频 mp4 | HTML 幻灯片 + SenseAudio TTS 配音 + ffmpeg 合成，横/竖屏；依赖 Python、Chrome、ffmpeg，详见其 README |
 | [music-gen](skills/music-gen/) | 一句需求生成一首带 AI 演唱的完整歌曲或纯音乐，并能截前奏、加开场致谢独白 | SenseAudio 音乐接口，0.5 元/首含封面；锁音色、可控对唱、观众接唱做不到，原因见其 README |
 | [doc-podcast](skills/doc-podcast/) | 把文档 / 网页 / 主题变成两位主播对谈的播客 mp3 + 按说话人的 srt | SenseAudio A1 多角色音频生成，0.017 元/秒（10 分钟约 10 元）；主播音色可锁定，背景乐外挂 |
+| [suno-music](skills/suno-music/) | Suno v6 出歌与纯音乐、锁定喜欢的嗓音复用、给自己的伴奏配唱、翻唱续写分轨、加开场独白 | 约 ¥0.10 一首（一次出两版），是 music-gen 的超集；锁音色与伴奏配唱已实测打通 |
+| [asr-tts](skills/asr-tts/) | 语音转文字、视频字幕、会议说话人区分与翻译、**从歌曲提取带时间轴的歌词**、文字转语音 | 商汤 ASR（Standard ¥1.8/小时）；TTS 商汤或免费 edge-tts 可切换 |
 
 ## 安装到你的项目
 
